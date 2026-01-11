@@ -60,16 +60,22 @@
             </svg>
           </button>
         </div>
-        <div class="flex gap-2 items-center">
-          <label class="text-gray-400 text-sm">Sort:</label>
-          <select id="sort"
-            class="px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none">
-            <option value="reviews">Most Reviews</option>
-            <option value="score">Review Score</option>
-            <option value="metacritic">Metacritic</option>
-            <option value="name">Name A-Z</option>
-            <option value="year">Release Year</option>
-          </select>
+        <div class="flex gap-4 items-center">
+          <div class="flex gap-2 items-center">
+            <label class="text-gray-400 text-sm">Sort:</label>
+            <select id="sort"
+              class="px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none">
+              <option value="reviews">Most Reviews</option>
+              <option value="score">Review Score</option>
+              <option value="metacritic">Metacritic</option>
+              <option value="name">Name A-Z</option>
+              <option value="year">Release Year</option>
+            </select>
+          </div>
+          <button id="show-favorites"
+            class="px-3 h-10 py-1.5 rounded-lg text-sm transition-colors bg-gray-700 text-gray-400 hover:text-white">
+            ⭐
+          </button>
         </div>
       </div>
       <!-- Tag filter chips -->
@@ -113,7 +119,8 @@
     <div class="min-h-screen flex items-center justify-center p-4">
       <div class="bg-gray-800 rounded-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto relative"
         onclick="event.stopPropagation()">
-        <button id="modal-close" class="absolute top-4 right-4 text-gray-400 hover:text-white text-2xl">&times;</button>
+        <button id="modal-close"
+          class="absolute top-4 right-4 w-10 h-10 rounded-full bg-gray-800 hover:bg-gray-700 flex items-center justify-center text-gray-300 hover:text-white text-2xl transition-colors">&times;</button>
         <div id="modal-content"></div>
       </div>
     </div>
@@ -124,9 +131,10 @@
     let allGames = [];
     let filteredGames = [];
     let currentPage = 1;
-    const perPage = 24;
+    const perPage = 100;
     let allTags = new Set();
     let selectedTags = new Set();  // Multi-tag filter
+    let favorites = new Set();  // Starred games
 
     // DOM elements
     const $loading = document.getElementById('loading');
@@ -136,6 +144,7 @@
     const $search = document.getElementById('search');
     const $clearSearch = document.getElementById('clear-search');
     const $sort = document.getElementById('sort');
+    const $showFavorites = document.getElementById('show-favorites');
     const $tagChips = document.getElementById('tag-chips');
     const $tagSearch = document.getElementById('tag-search');
     const $selectedTags = document.getElementById('selected-tags');
@@ -148,9 +157,35 @@
     // Tag data for filtering
     let sortedTagsData = [];
 
+    // Favorites management
+    function loadFavorites() {
+      const stored = localStorage.getItem('favorites');
+      return stored ? new Set(JSON.parse(stored)) : new Set();
+    }
+
+    function saveFavorites() {
+      localStorage.setItem('favorites', JSON.stringify([...favorites]));
+    }
+
+    function toggleFavorite(appId, event) {
+      if (event) event.stopPropagation();
+      if (favorites.has(appId)) {
+        favorites.delete(appId);
+      } else {
+        favorites.add(appId);
+      }
+      saveFavorites();
+      render();
+      // Update modal if it's open
+      if (!$modal.classList.contains('hidden')) {
+        showModal(appId);
+      }
+    }
+
     // Load data
     async function loadData() {
       try {
+        favorites = loadFavorites();
         const response = await fetch('./games.json');
         const data = await response.json();
 
@@ -270,6 +305,7 @@
     function applyFilters() {
       const search = $search.value.toLowerCase().trim();
       const sort = $sort.value;
+      const showOnlyFavorites = $showFavorites.classList.contains('bg-blue-600');
 
       // Filter
       filteredGames = allGames.filter(g => {
@@ -284,6 +320,8 @@
             if (!gameTags.has(tag)) return false;
           }
         }
+        // Favorites filter
+        if (showOnlyFavorites && !favorites.has(g.steamAppId)) return false;
         return true;
       });
 
@@ -323,7 +361,12 @@
       // Render grid
       $grid.innerHTML = pageGames.map(g => `
         <div class="bg-gray-800 rounded-lg overflow-hidden hover:ring-2 hover:ring-blue-500 transition cursor-pointer" onclick="showModal(${g.steamAppId})">
-          <img src="${g.headerImage || 'https://via.placeholder.com/460x215?text=No+Image'}" alt="${escapeHtml(g.name)}" class="w-full h-32 object-cover" loading="lazy">
+          <div class="relative">
+            <img src="${g.headerImage || 'https://via.placeholder.com/460x215?text=No+Image'}" alt="${escapeHtml(g.name)}" class="w-full h-32 object-cover" loading="lazy">
+            <button onclick="toggleFavorite(${g.steamAppId}, event)" class="absolute top-2 right-2 text-2xl hover:scale-110 transition-all drop-shadow-lg ${favorites.has(g.steamAppId) ? '' : 'grayscale opacity-60'}" title="Toggle favorite">
+              ⭐
+            </button>
+          </div>
           <div class="p-3">
             <h3 class="font-semibold text-white line-clamp-2 text-sm mb-1">${escapeHtml(g.name)}</h3>
             <p class="text-xs text-gray-400 mb-2">${g.releaseYear || 'N/A'} · ${escapeHtml(g.developer || 'Unknown')}</p>
@@ -366,7 +409,12 @@
         <div class="p-6">
           <div class="flex items-start justify-between gap-4 mb-4">
             <h2 class="text-2xl font-bold text-white">${escapeHtml(game.name)}</h2>
-            <a href="https://store.steampowered.com/app/${game.steamAppId}" target="_blank" class="shrink-0 px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded text-white text-sm">View on Steam</a>
+            <div class="flex items-center gap-2 shrink-0">
+              <button onclick="toggleFavorite(${game.steamAppId}, event)" class="px-3 py-2 bg-gray-700 hover:bg-gray-600 rounded text-white text-sm transition-all ${favorites.has(game.steamAppId) ? '' : 'grayscale opacity-60'}" title="Toggle favorite">
+                ⭐
+              </button>
+              <a href="https://store.steampowered.com/app/${game.steamAppId}" target="_blank" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded text-white text-sm">View on Steam</a>
+            </div>
           </div>
           
           <div class="flex flex-wrap gap-4 text-sm text-gray-400 mb-4">
@@ -436,6 +484,13 @@
       debounceTimer = setTimeout(applyFilters, 200);
     });
     $sort.addEventListener('change', applyFilters);
+    $showFavorites.addEventListener('click', () => {
+      $showFavorites.classList.toggle('bg-blue-600');
+      $showFavorites.classList.toggle('text-white');
+      $showFavorites.classList.toggle('bg-gray-700');
+      $showFavorites.classList.toggle('text-gray-400');
+      applyFilters();
+    });
     $modalClose.addEventListener('click', closeModal);
     document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeModal(); });
 
