@@ -375,8 +375,8 @@
           </div>
 
           <div class="flex flex-wrap gap-2 mb-4">
-            ${game.reviewScoreDesc ? `<span class="px-3 py-1 rounded ${getScoreClass(game.reviewScore)} text-sm">${escapeHtml(game.reviewScoreDesc)} (${(game.totalReviews || 0).toLocaleString()} reviews)</span>` : ''}
-            ${game.metacriticScore ? `<span class="px-3 py-1 rounded bg-green-600 text-sm">Metacritic: ${game.metacriticScore}</span>` : ''}
+            ${game.reviewScoreDesc ? `<a href="https://store.steampowered.com/app/${game.steamAppId}#app_reviews_hash" target="_blank" class="px-3 py-1 rounded ${getScoreClass(game.reviewScore)} text-sm hover:opacity-80 transition-opacity cursor-pointer">${escapeHtml(game.reviewScoreDesc)} (${(game.totalReviews || 0).toLocaleString()} reviews)</a>` : ''}
+            ${game.metacriticScore && game.metacriticUrl ? `<a href="${game.metacriticUrl}" target="_blank" class="px-3 py-1 rounded bg-green-600 hover:bg-green-700 text-sm transition-colors cursor-pointer">Metacritic: ${game.metacriticScore}</a>` : game.metacriticScore ? `<span class="px-3 py-1 rounded bg-green-600 text-sm">Metacritic: ${game.metacriticScore}</span>` : ''}
           </div>
 
           <p class="text-gray-300 mb-4">${escapeHtml(game.shortDescription || 'No description available.')}</p>
@@ -402,12 +402,6 @@
                 ${game.screenshots.slice(0, 4).map(s => `<img src="${s}" class="rounded w-full" loading="lazy">`).join('')}
               </div>
             </div>
-          ` : ''}
-
-          ${game.metacriticUrl ? `
-          <div class="mt-6">
-            <a href="${game.metacriticUrl}" target="_blank" class="px-4 py-2 bg-green-600 hover:bg-green-700 rounded text-white text-sm">View on Metacritic</a>
-          </div>
           ` : ''}
         </div>
       `;
