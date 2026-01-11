@@ -1,0 +1,28 @@
+{
+  "name": "turnbased-game-scraper",
+  "version": "2.0.0",
+  "description": "Pipeline scraper for turn-based games from Steam and other sources",
+  "type": "module",
+  "scripts": {
+    "pipeline": "tsx src/pipeline.ts",
+    "pipeline:enhance": "tsx src/pipeline.ts --skip-extract",
+    "pipeline:export": "tsx src/pipeline.ts --skip-extract --skip-enhance",
+    "extract:steam": "tsx src/extract-steam-search.ts",
+    "extract:tbl": "tsx src/extract-turnbasedlovers.ts",
+    "step:steam": "tsx src/step-steam.ts",
+    "step:metacritic": "tsx src/step-metacritic.ts",
+    "test:steam-search": "tsx src/test-steam-search.ts",
+    "test:steam-api": "tsx src/test-steam-api.ts",
+    "test:tbl": "tsx src/test-tbl.ts",
+    "viewer": "npx serve output -p 3000"
+  },
+  "dependencies": {
+    "cheerio": "^1.0.0",
+    "axios": "^1.6.0"
+  },
+  "devDependencies": {
+    "tsx": "^4.7.0",
+    "@types/node": "^20.11.0",
+    "typescript": "^5.3.0"
+  }
+}
