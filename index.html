@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Turn-Based Games Database</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    [x-cloak] {
+      display: none !important;
+    }
+
+    .line-clamp-2 {
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+
+    .line-clamp-3 {
+      display: -webkit-box;
+      -webkit-line-clamp: 3;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+  </style>
+</head>
+
+<body class="bg-gray-900 text-gray-100 min-h-screen">
+  <div id="app" class="container mx-auto px-4 py-8 max-w-7xl">
+    <!-- Header -->
+    <header class="mb-8">
+      <h1 class="text-3xl font-bold text-white mb-2">🎮 Turn-Based Games Database</h1>
+      <p class="text-gray-400" id="stats">Loading...</p>
+    </header>
+
+    <!-- Search & Filters -->
+    <div class="bg-gray-800 rounded-lg p-4 mb-4">
+      <div class="flex flex-wrap gap-4 mb-4">
+        <div class="flex-1 min-w-64">
+          <input type="text" id="search" placeholder="Search games..."
+            class="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-blue-500">
+        </div>
+        <div class="flex gap-2 items-center">
+          <label class="text-gray-400 text-sm">Sort:</label>
+          <select id="sort"
+            class="px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none">
+            <option value="reviews">Most Reviews</option>
+            <option value="score">Review Score</option>
+            <option value="metacritic">Metacritic</option>
+            <option value="name">Name A-Z</option>
+            <option value="year">Release Year</option>
+          </select>
+        </div>
+      </div>
+      <!-- Tag filter chips -->
+      <div id="selected-tags" class="hidden flex flex-wrap gap-2 mb-3">
+        <span class="text-gray-400 text-sm">Active filters:</span>
+      </div>
+      <details class="group" id="tag-details">
+        <summary class="cursor-pointer text-sm text-gray-400 hover:text-white flex items-center gap-1">
+          <span>🏷️ Filter by tags</span>
+          <span class="text-xs" id="tag-count"></span>
+        </summary>
+        <div class="mt-3">
+          <input type="text" id="tag-search" placeholder="Search tags..."
+            class="w-full max-w-xs px-3 py-1.5 mb-3 text-sm bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-blue-500">
+          <div id="tag-chips" class="flex flex-wrap gap-1.5 max-h-48 overflow-y-auto"></div>
+        </div>
+      </details>
+    </div>
+
+    <!-- Loading State -->
+    <div id="loading" class="text-center py-20">
+      <div class="inline-block animate-spin rounded-full h-12 w-12 border-4 border-blue-500 border-t-transparent"></div>
+      <p class="mt-4 text-gray-400">Loading games database...</p>
+    </div>
+
+    <!-- Games Grid -->
+    <div id="games-grid" class="hidden grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mb-6"></div>
+
+    <!-- Pagination -->
+    <div id="pagination" class="hidden flex justify-center items-center gap-2 mb-8"></div>
+
+    <!-- No Results -->
+    <div id="no-results" class="hidden text-center py-20 text-gray-400">
+      <p class="text-xl">No games found</p>
+      <p class="text-sm mt-2">Try adjusting your search or filters</p>
+    </div>
+  </div>
+
+  <!-- Modal -->
+  <div id="modal" class="hidden fixed inset-0 bg-black/80 z-50 overflow-y-auto">
+    <div class="min-h-screen flex items-center justify-center p-4">
+      <div class="bg-gray-800 rounded-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto relative">
+        <button id="modal-close" class="absolute top-4 right-4 text-gray-400 hover:text-white text-2xl">&times;</button>
+        <div id="modal-content"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // State
+    let allGames = [];
+    let filteredGames = [];
+    let currentPage = 1;
+    const perPage = 24;
+    let allTags = new Set();
+    let selectedTags = new Set();  // Multi-tag filter
+
+    // DOM elements
+    const $loading = document.getElementById('loading');
+    const $grid = document.getElementById('games-grid');
+    const $pagination = document.getElementById('pagination');
+    const $noResults = document.getElementById('no-results');
+    const $search = document.getElementById('search');
+    const $sort = document.getElementById('sort');
+    const $tagChips = document.getElementById('tag-chips');
+    const $tagSearch = document.getElementById('tag-search');
+    const $selectedTags = document.getElementById('selected-tags');
+    const $tagCount = document.getElementById('tag-count');
+    const $stats = document.getElementById('stats');
+    const $modal = document.getElementById('modal');
+    const $modalContent = document.getElementById('modal-content');
+    const $modalClose = document.getElementById('modal-close');
+
+    // Tag data for filtering
+    let sortedTagsData = [];
+
+    // Load data
+    async function loadData() {
+      try {
+        const response = await fetch('./games.json');
+        const data = await response.json();
+
+        // Convert object to array and filter only enhanced games
+        allGames = Object.values(data).filter(g => g.steps?.steam?.status === 'success');
+
+        // Collect all tags with counts
+        const tagCounts = {};
+        allGames.forEach(g => {
+          (g.tags || []).forEach(t => {
+            allTags.add(t);
+            tagCounts[t] = (tagCounts[t] || 0) + 1;
+          });
+        });
+
+        // Render tag chips (sorted by count, most popular first)
+        const sortedTags = [...allTags].sort((a, b) => tagCounts[b] - tagCounts[a]);
+        sortedTagsData = sortedTags.map(tag => ({ tag, count: tagCounts[tag] }));
+        $tagCount.textContent = `(${sortedTags.length} tags)`;
+        renderTagChips();
+
+        // Add click handlers for tag chips
+        $tagChips.addEventListener('click', (e) => {
+          const chip = e.target.closest('.tag-chip');
+          if (!chip) return;
+          const tag = chip.dataset.tag;
+          toggleTag(tag);
+        });
+
+        // Tag search filter
+        $tagSearch.addEventListener('input', renderTagChips);
+
+        $stats.textContent = `${allGames.length} games loaded`;
+        $loading.classList.add('hidden');
+
+        applyFilters();
+      } catch (err) {
+        $loading.innerHTML = `<p class="text-red-400">Error loading data: ${err.message}</p>`;
+      }
+    }
+
+    // Render tag chips with optional filter
+    function renderTagChips() {
+      const search = $tagSearch.value.toLowerCase().trim();
+      const filtered = search
+        ? sortedTagsData.filter(t => t.tag.toLowerCase().includes(search))
+        : sortedTagsData;
+
+      $tagChips.innerHTML = filtered.map(({ tag, count }) => {
+        const isSelected = selectedTags.has(tag);
+        const bgClass = isSelected ? 'bg-blue-600 text-white' : 'bg-gray-700 text-gray-300';
+        return `<button 
+          data-tag="${escapeHtml(tag)}" 
+          class="tag-chip px-2 py-1 text-xs rounded ${bgClass} hover:bg-gray-600 transition"
+        >${escapeHtml(tag)} <span class="${isSelected ? 'text-blue-200' : 'text-gray-500'}">(${count})</span></button>`;
+      }).join('');
+
+      if (filtered.length === 0) {
+        $tagChips.innerHTML = '<p class="text-gray-500 text-sm">No tags match your search</p>';
+      }
+    }
+
+    // Toggle tag selection
+    function toggleTag(tag) {
+      if (selectedTags.has(tag)) {
+        selectedTags.delete(tag);
+      } else {
+        selectedTags.add(tag);
+      }
+      updateTagUI();
+      applyFilters();
+    }
+
+    // Update tag chips visual state
+    function updateTagUI() {
+      // Re-render chips to update styles
+      renderTagChips();
+
+      // Update selected tags display
+      if (selectedTags.size > 0) {
+        $selectedTags.classList.remove('hidden');
+        $selectedTags.innerHTML = `
+          <span class="text-gray-400 text-sm">Active filters:</span>
+          ${[...selectedTags].map(t => `
+            <button onclick="toggleTag('${escapeHtml(t).replace(/'/g, "\\'")}')"
+              class="px-2 py-1 text-xs rounded bg-blue-600 text-white hover:bg-blue-700 flex items-center gap-1">
+              ${escapeHtml(t)} <span class="text-blue-200">×</span>
+            </button>
+          `).join('')}
+          <button onclick="clearTags()" class="px-2 py-1 text-xs rounded bg-red-600/50 text-red-200 hover:bg-red-600">Clear all</button>
+        `;
+      } else {
+        $selectedTags.classList.add('hidden');
+      }
+    }
+
+    // Clear all tag filters
+    function clearTags() {
+      selectedTags.clear();
+      updateTagUI();
+      applyFilters();
+    }
+
+    // Apply search, sort, and filters
+    function applyFilters() {
+      const search = $search.value.toLowerCase().trim();
+      const sort = $sort.value;
+
+      // Filter
+      filteredGames = allGames.filter(g => {
+        if (search) {
+          const searchable = [g.name, g.developer, g.publisher, g.shortDescription, ...(g.tags || [])].join(' ').toLowerCase();
+          if (!searchable.includes(search)) return false;
+        }
+        // Multi-tag filter: game must have ALL selected tags
+        if (selectedTags.size > 0) {
+          const gameTags = new Set(g.tags || []);
+          for (const tag of selectedTags) {
+            if (!gameTags.has(tag)) return false;
+          }
+        }
+        return true;
+      });
+
+      // Sort
+      filteredGames.sort((a, b) => {
+        switch (sort) {
+          case 'reviews': return (b.totalReviews || 0) - (a.totalReviews || 0);
+          case 'score': return (b.reviewScore || 0) - (a.reviewScore || 0);
+          case 'metacritic': return (b.metacriticScore || 0) - (a.metacriticScore || 0);
+          case 'name': return (a.name || '').localeCompare(b.name || '');
+          case 'year': return (b.releaseYear || 0) - (a.releaseYear || 0);
+          default: return 0;
+        }
+      });
+
+      currentPage = 1;
+      render();
+    }
+
+    // Render games grid
+    function render() {
+      const totalPages = Math.ceil(filteredGames.length / perPage);
+      const start = (currentPage - 1) * perPage;
+      const pageGames = filteredGames.slice(start, start + perPage);
+
+      if (filteredGames.length === 0) {
+        $grid.classList.add('hidden');
+        $pagination.classList.add('hidden');
+        $noResults.classList.remove('hidden');
+        return;
+      }
+
+      $noResults.classList.add('hidden');
+      $grid.classList.remove('hidden');
+      $pagination.classList.remove('hidden');
+
+      // Render grid
+      $grid.innerHTML = pageGames.map(g => `
+        <div class="bg-gray-800 rounded-lg overflow-hidden hover:ring-2 hover:ring-blue-500 transition cursor-pointer" onclick="showModal(${g.steamAppId})">
+          <img src="${g.headerImage || 'https://via.placeholder.com/460x215?text=No+Image'}" alt="${escapeHtml(g.name)}" class="w-full h-32 object-cover" loading="lazy">
+          <div class="p-3">
+            <h3 class="font-semibold text-white line-clamp-2 text-sm mb-1">${escapeHtml(g.name)}</h3>
+            <p class="text-xs text-gray-400 mb-2">${g.releaseYear || 'N/A'} · ${escapeHtml(g.developer || 'Unknown')}</p>
+            <div class="flex items-center gap-2 text-xs">
+              ${g.reviewScoreDesc ? `<span class="px-2 py-0.5 rounded ${getScoreClass(g.reviewScore)}">${escapeHtml(g.reviewScoreDesc)}</span>` : ''}
+              ${g.metacriticScore ? `<span class="px-2 py-0.5 rounded bg-green-600">${g.metacriticScore}</span>` : ''}
+            </div>
+            <div class="mt-2 flex flex-wrap gap-1">
+              ${(g.tags || []).slice(0, 3).map(t => `<span class="text-xs bg-gray-700 px-1.5 py-0.5 rounded">${escapeHtml(t)}</span>`).join('')}
+            </div>
+          </div>
+        </div>
+      `).join('');
+
+      // Render pagination
+      $pagination.innerHTML = `
+        <button onclick="goToPage(1)" class="px-3 py-1 rounded bg-gray-700 hover:bg-gray-600 disabled:opacity-50" ${currentPage === 1 ? 'disabled' : ''}>&laquo;</button>
+        <button onclick="goToPage(${currentPage - 1})" class="px-3 py-1 rounded bg-gray-700 hover:bg-gray-600 disabled:opacity-50" ${currentPage === 1 ? 'disabled' : ''}>Prev</button>
+        <span class="px-4 py-1 text-gray-400">Page ${currentPage} of ${totalPages}</span>
+        <button onclick="goToPage(${currentPage + 1})" class="px-3 py-1 rounded bg-gray-700 hover:bg-gray-600 disabled:opacity-50" ${currentPage === totalPages ? 'disabled' : ''}>Next</button>
+        <button onclick="goToPage(${totalPages})" class="px-3 py-1 rounded bg-gray-700 hover:bg-gray-600 disabled:opacity-50" ${currentPage === totalPages ? 'disabled' : ''}>&raquo;</button>
+      `;
+
+      $stats.textContent = `Showing ${start + 1}-${Math.min(start + perPage, filteredGames.length)} of ${filteredGames.length} games`;
+    }
+
+    function goToPage(page) {
+      currentPage = page;
+      render();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    // Show modal
+    function showModal(appId) {
+      const game = allGames.find(g => g.steamAppId === appId);
+      if (!game) return;
+
+      $modalContent.innerHTML = `
+        <img src="${game.headerImage || ''}" alt="${escapeHtml(game.name)}" class="w-full h-64 object-cover rounded-t-xl">
+        <div class="p-6">
+          <h2 class="text-2xl font-bold text-white mb-2">${escapeHtml(game.name)}</h2>
+          
+          <div class="flex flex-wrap gap-4 text-sm text-gray-400 mb-4">
+            <span>🏢 ${escapeHtml(game.developer || 'Unknown')}</span>
+            <span>📅 ${game.releaseDate || 'N/A'}</span>
+            <span>💰 ${game.isFree ? 'Free to Play' : (game.priceFormatted || 'N/A')}</span>
+          </div>
+
+          <div class="flex flex-wrap gap-2 mb-4">
+            ${game.reviewScoreDesc ? `<span class="px-3 py-1 rounded ${getScoreClass(game.reviewScore)} text-sm">${escapeHtml(game.reviewScoreDesc)} (${(game.totalReviews || 0).toLocaleString()} reviews)</span>` : ''}
+            ${game.metacriticScore ? `<span class="px-3 py-1 rounded bg-green-600 text-sm">Metacritic: ${game.metacriticScore}</span>` : ''}
+          </div>
+
+          <p class="text-gray-300 mb-4">${escapeHtml(game.shortDescription || 'No description available.')}</p>
+
+          <div class="mb-4">
+            <h4 class="text-sm font-semibold text-gray-400 mb-2">Tags</h4>
+            <div class="flex flex-wrap gap-1">
+              ${(game.tags || []).map(t => `<span class="text-xs bg-gray-700 px-2 py-1 rounded">${escapeHtml(t)}</span>`).join('')}
+            </div>
+          </div>
+
+          <div class="mb-4">
+            <h4 class="text-sm font-semibold text-gray-400 mb-2">Genres</h4>
+            <div class="flex flex-wrap gap-1">
+              ${(game.genres || []).map(t => `<span class="text-xs bg-blue-900 px-2 py-1 rounded">${escapeHtml(t)}</span>`).join('')}
+            </div>
+          </div>
+
+          ${game.screenshots?.length ? `
+            <div class="mb-4">
+              <h4 class="text-sm font-semibold text-gray-400 mb-2">Screenshots</h4>
+              <div class="grid grid-cols-2 gap-2">
+                ${game.screenshots.slice(0, 4).map(s => `<img src="${s}" class="rounded w-full" loading="lazy">`).join('')}
+              </div>
+            </div>
+          ` : ''}
+
+          <div class="flex gap-2 mt-6">
+            <a href="https://store.steampowered.com/app/${game.steamAppId}" target="_blank" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded text-white text-sm">View on Steam</a>
+            ${game.metacriticUrl ? `<a href="${game.metacriticUrl}" target="_blank" class="px-4 py-2 bg-green-600 hover:bg-green-700 rounded text-white text-sm">View on Metacritic</a>` : ''}
+          </div>
+        </div>
+      `;
+
+      $modal.classList.remove('hidden');
+      document.body.style.overflow = 'hidden';
+    }
+
+    function closeModal() {
+      $modal.classList.add('hidden');
+      document.body.style.overflow = '';
+    }
+
+    // Helpers
+    function escapeHtml(str) {
+      if (!str) return '';
+      return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
+    function getScoreClass(score) {
+      if (score >= 80) return 'bg-green-600';
+      if (score >= 60) return 'bg-yellow-600';
+      if (score >= 40) return 'bg-orange-600';
+      return 'bg-red-600';
+    }
+
+    // Event listeners
+    let debounceTimer;
+    $search.addEventListener('input', () => {
+      clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(applyFilters, 200);
+    });
+    $sort.addEventListener('change', applyFilters);
+    $modalClose.addEventListener('click', closeModal);
+    $modal.addEventListener('click', (e) => { if (e.target === $modal) closeModal(); });
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeModal(); });
+
+    // Init
+    loadData();
+  </script>
+</body>
+
+</html>
