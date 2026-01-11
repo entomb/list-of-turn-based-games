@@ -12,15 +12,18 @@ const STEAM_SEARCH_BASE = "https://store.steampowered.com/search/results/"
 // Tag IDs reference:
 // 9 = Strategy, 1666 = Card Game, 14139 = Turn-Based
 // 4325 = Turn-Based Strategy, 17389 = Deckbuilding, 1677 = Turn-Based Tactics
+// 791774 = Card Battler, 4182 = Singleplayer, 3959 = Roguelike
 
 // Multiple search configurations - each will be searched
 const SEARCH_CONFIGS = [
-  { tags: "1666,17389", name: "Card Game + Deckbuilding", target: 150 },
-  { tags: "1666,14139", name: "Card Game + Turn-Based", target: 150 },
-  { tags: "1666,4325", name: "Card Game + Turn-Based Strategy", target: 150 },
-  { tags: "1666,3959", name: "Card Game + Roguelike", target: 100 },
-  { tags: "17389,14139", name: "Deckbuilding + Turn-Based", target: 150 },
-  { tags: "17389,4325", name: "Deckbuilding + Turn-Based Strategy", target: 150 },
+  { tags: "1666,17389", name: "Card Game + Deckbuilding", target: 250 },
+  { tags: "1666,14139", name: "Card Game + Turn-Based", target: 250 },
+  { tags: "1666,4325", name: "Card Game + Turn-Based Strategy", target: 250 },
+  { tags: "1666,3959", name: "Card Game + Roguelike", target: 250 },
+  { tags: "17389,14139", name: "Deckbuilding + Turn-Based", target: 250 },
+  { tags: "791774,4182", name: "Card Battler + Singleplayer", target: 250 },
+  { tags: "1666,1677", name: "Card Game + Turn-Based Tactics", target: 250 },
+  { tags: "17389,1677", name: "Deckbuilding + Turn-Based Tactics", target: 250 },
 ]
 
 interface SteamSearchResult {
