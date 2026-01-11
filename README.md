@@ -1,6 +1,6 @@
-# Turn-Based Game Scraper
+# Card-Based Strategy Game Scraper
 
-A pipeline scraper that collects turn-based card games from Steam and other sources, enriches them with metadata, and provides a browsable web viewer.
+A pipeline scraper that collects card-based strategy games from Steam and other sources, enriches them with metadata, and provides a browsable web viewer.
 
 ## 🎮 Live Viewer
 
@@ -19,9 +19,12 @@ A pipeline scraper that collects turn-based card games from Steam and other sour
 
 The scraper searches for games matching these tag combinations:
 
-- Card Game + Strategy
-- Turn-Based + Card Game
-- Turn-Based Strategy + Card Game
+- Card Game + Deckbuilding
+- Card Game + Turn-Based
+- Card Game + Turn-Based Strategy
+- Card Game + Roguelike
+- Deckbuilding + Turn-Based
+- Deckbuilding + Turn-Based Strategy
 
 ## Usage
 

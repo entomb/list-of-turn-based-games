@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Turn-Based Games Database</title>
+  <title>I love card games!</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
     [x-cloak] {
@@ -33,7 +33,7 @@
     <header class="mb-8">
       <div class="flex items-center justify-between mb-2">
         <h1 class="text-3xl font-bold text-white cursor-pointer hover:text-blue-400 transition-colors"
-          onclick="location.reload()">🎮 Turn-Based Games Database</h1>
+          onclick="location.reload()">� I love card games!</h1>
         <a href="https://github.com/entomb/list-of-turn-based-games" target="_blank" rel="noopener noreferrer"
           class="flex items-center gap-2 px-3 py-1.5 bg-gray-800 hover:bg-gray-700 rounded-lg text-gray-300 hover:text-white transition-colors">
           <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
@@ -309,15 +309,20 @@
 
       // Filter
       filteredGames = allGames.filter(g => {
+        // Must have Card Game or Deckbuilding tag from Steam
+        const gameTags = (g.tags || []).map(t => t.toLowerCase());
+        const hasCardTag = gameTags.some(t => t.includes('card') || t.includes('deckbuilding'));
+        if (!hasCardTag) return false;
+
         if (search) {
           const searchable = [g.name, g.developer, g.publisher, g.shortDescription, ...(g.tags || [])].join(' ').toLowerCase();
           if (!searchable.includes(search)) return false;
         }
         // Multi-tag filter: game must have ALL selected tags
         if (selectedTags.size > 0) {
-          const gameTags = new Set(g.tags || []);
+          const gameTagsSet = new Set(g.tags || []);
           for (const tag of selectedTags) {
-            if (!gameTags.has(tag)) return false;
+            if (!gameTagsSet.has(tag)) return false;
           }
         }
         // Favorites filter

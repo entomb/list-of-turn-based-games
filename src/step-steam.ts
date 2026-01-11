@@ -189,7 +189,15 @@ export const steamStep: PipelineStep = {
           game.tags = tags
         }
 
-        if (game.steps.steam.status === "success") {
+        // Filter: Must have card-related tags
+        const hasCardTag = game.tags?.some(
+          (tag) => tag.toLowerCase().includes("card") || tag.toLowerCase().includes("deckbuilding")
+        )
+
+        if (!hasCardTag) {
+          game.steps.steam = stepSkipped("Not a card/deckbuilding game")
+          failed++
+        } else if (game.steps.steam.status === "success") {
           success++
         } else {
           failed++

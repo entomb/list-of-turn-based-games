@@ -15,9 +15,12 @@ const STEAM_SEARCH_BASE = "https://store.steampowered.com/search/results/"
 
 // Multiple search configurations - each will be searched
 const SEARCH_CONFIGS = [
-  { tags: "1666,9", name: "Card Game + Strategy", target: 150 },
-  { tags: "14139,1666", name: "Turn-Based + Card Game", target: 150 },
-  { tags: "4325,1666", name: "Turn-Based Strategy + Card Game", target: 100 },
+  { tags: "1666,17389", name: "Card Game + Deckbuilding", target: 150 },
+  { tags: "1666,14139", name: "Card Game + Turn-Based", target: 150 },
+  { tags: "1666,4325", name: "Card Game + Turn-Based Strategy", target: 150 },
+  { tags: "1666,3959", name: "Card Game + Roguelike", target: 100 },
+  { tags: "17389,14139", name: "Deckbuilding + Turn-Based", target: 150 },
+  { tags: "17389,4325", name: "Deckbuilding + Turn-Based Strategy", target: 150 },
 ]
 
 interface SteamSearchResult {
