@@ -151,9 +151,12 @@ export const metacriticStep: PipelineStep = {
   async run(games: Map<number, GameDetails>): Promise<void> {
     console.log("\n📊 Running Metacritic enhancement step...")
 
-    // Only process games that completed Steam step and don't have Metacritic done
+    // Only process games that completed Steam step and don't have a Metacritic score yet
     const pending = Array.from(games.values()).filter(
-      (g) => g.steps.steam.status === "success" && g.steps.metacritic.status === "pending"
+      (g) =>
+        g.steps.steam.status === "success" &&
+        g.metacriticScore === null &&
+        (g.steps.metacritic.status === "pending" || g.steps.metacritic.status === "failed")
     )
 
     console.log(`  ${pending.length} games pending Metacritic enhancement`)
