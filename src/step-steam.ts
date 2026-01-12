@@ -118,7 +118,8 @@ async function enhanceGame(game: GameDetails): Promise<void> {
   game.priceFormatted = data.price_overview?.final_formatted || (data.is_free ? "Free" : null)
 
   // Metacritic from Steam API (bonus - may be available)
-  if (data.metacritic) {
+  // Only use if URL is valid (not just ending in /game/)
+  if (data.metacritic && data.metacritic.url && !data.metacritic.url.endsWith("/game/")) {
     game.metacriticScore = data.metacritic.score
     game.metacriticUrl = data.metacritic.url
   }
