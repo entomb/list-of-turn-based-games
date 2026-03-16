@@ -4,7 +4,29 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Turn-Based Games Database</title>
+  <title>List of Card & Deckbuilding Games on Steam</title>
+
+  <!-- SEO Meta Tags -->
+  <meta name="description"
+    content="Browse and discover card-based strategy games from Steam. Search, filter, and explore deckbuilding games, turn-based card games, and more.">
+  <meta name="keywords" content="card games, deckbuilding, steam games, strategy games, turn-based games">
+
+  <!-- Open Graph / Facebook -->
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://entomb.github.io/list-of-turn-based-games/">
+  <meta property="og:title" content="List of Card & Deckbuilding Games on Steam">
+  <meta property="og:description"
+    content="Browse and discover card-based strategy games from Steam. Search, filter, and explore deckbuilding games, turn-based card games, and more.">
+  <meta property="og:image" content="https://github.com/entomb.png?size=1200">
+
+  <!-- Twitter -->
+  <meta property="twitter:card" content="summary_large_image">
+  <meta property="twitter:url" content="https://entomb.github.io/list-of-turn-based-games/">
+  <meta property="twitter:title" content="List of Card & Deckbuilding Games on Steam">
+  <meta property="twitter:description"
+    content="Browse and discover card-based strategy games from Steam. Search, filter, and explore deckbuilding games, turn-based card games, and more.">
+  <meta property="twitter:image" content="https://github.com/entomb.png?size=1200">
+
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
     [x-cloak] {
@@ -32,8 +54,11 @@
     <!-- Header -->
     <header class="mb-8">
       <div class="flex items-center justify-between mb-2">
-        <h1 class="text-3xl font-bold text-white cursor-pointer hover:text-blue-400 transition-colors"
-          onclick="location.reload()">🎮 Turn-Based Games Database</h1>
+        <div>
+          <h1 class="text-3xl font-bold text-white cursor-pointer hover:text-blue-400 transition-colors"
+            onclick="location.reload()">Card & Deckbuilding Games</h1>
+          <p class="text-xl text-gray-400">A growing list of turn-based card and deckbuilding games on Steam.</p>
+        </div>
         <a href="https://github.com/entomb/list-of-turn-based-games" target="_blank" rel="noopener noreferrer"
           class="flex items-center gap-2 px-3 py-1.5 bg-gray-800 hover:bg-gray-700 rounded-lg text-gray-300 hover:text-white transition-colors">
           <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
@@ -60,16 +85,22 @@
             </svg>
           </button>
         </div>
-        <div class="flex gap-2 items-center">
-          <label class="text-gray-400 text-sm">Sort:</label>
-          <select id="sort"
-            class="px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none">
-            <option value="reviews">Most Reviews</option>
-            <option value="score">Review Score</option>
-            <option value="metacritic">Metacritic</option>
-            <option value="name">Name A-Z</option>
-            <option value="year">Release Year</option>
-          </select>
+        <div class="flex gap-4 items-center">
+          <div class="flex gap-2 items-center">
+            <label class="text-gray-400 text-sm">Sort:</label>
+            <select id="sort"
+              class="px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none">
+              <option value="reviews">Most Reviews</option>
+              <option value="score">Review Score</option>
+              <option value="metacritic">Metacritic</option>
+              <option value="name">Name A-Z</option>
+              <option value="year">Release Year</option>
+            </select>
+          </div>
+          <button id="show-favorites"
+            class="px-3 h-10 py-1.5 rounded-lg text-sm transition-colors bg-gray-700 text-gray-400 hover:text-white">
+            ⭐
+          </button>
         </div>
       </div>
       <!-- Tag filter chips -->
@@ -109,10 +140,12 @@
   </div>
 
   <!-- Modal -->
-  <div id="modal" class="hidden fixed inset-0 bg-black/80 z-50 overflow-y-auto">
+  <div id="modal" class="hidden fixed inset-0 bg-black/80 z-50 overflow-y-auto" onclick="closeModal()">
     <div class="min-h-screen flex items-center justify-center p-4">
-      <div class="bg-gray-800 rounded-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto relative">
-        <button id="modal-close" class="absolute top-4 right-4 text-gray-400 hover:text-white text-2xl">&times;</button>
+      <div class="bg-gray-800 rounded-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto relative"
+        onclick="event.stopPropagation()">
+        <button id="modal-close"
+          class="absolute top-4 right-4 w-10 h-10 rounded-full bg-gray-800 hover:bg-gray-700 flex items-center justify-center text-gray-300 hover:text-white text-2xl transition-colors">&times;</button>
         <div id="modal-content"></div>
       </div>
     </div>
@@ -123,9 +156,10 @@
     let allGames = [];
     let filteredGames = [];
     let currentPage = 1;
-    const perPage = 24;
+    const perPage = 100;
     let allTags = new Set();
     let selectedTags = new Set();  // Multi-tag filter
+    let favorites = new Set();  // Starred games
 
     // DOM elements
     const $loading = document.getElementById('loading');
@@ -135,6 +169,7 @@
     const $search = document.getElementById('search');
     const $clearSearch = document.getElementById('clear-search');
     const $sort = document.getElementById('sort');
+    const $showFavorites = document.getElementById('show-favorites');
     const $tagChips = document.getElementById('tag-chips');
     const $tagSearch = document.getElementById('tag-search');
     const $selectedTags = document.getElementById('selected-tags');
@@ -147,9 +182,35 @@
     // Tag data for filtering
     let sortedTagsData = [];
 
+    // Favorites management
+    function loadFavorites() {
+      const stored = localStorage.getItem('favorites');
+      return stored ? new Set(JSON.parse(stored)) : new Set();
+    }
+
+    function saveFavorites() {
+      localStorage.setItem('favorites', JSON.stringify([...favorites]));
+    }
+
+    function toggleFavorite(appId, event) {
+      if (event) event.stopPropagation();
+      if (favorites.has(appId)) {
+        favorites.delete(appId);
+      } else {
+        favorites.add(appId);
+      }
+      saveFavorites();
+      render();
+      // Update modal if it's open
+      if (!$modal.classList.contains('hidden')) {
+        showModal(appId);
+      }
+    }
+
     // Load data
     async function loadData() {
       try {
+        favorites = loadFavorites();
         const response = await fetch('./games.json');
         const data = await response.json();
 
@@ -269,20 +330,28 @@
     function applyFilters() {
       const search = $search.value.toLowerCase().trim();
       const sort = $sort.value;
+      const showOnlyFavorites = $showFavorites.classList.contains('bg-blue-600');
 
       // Filter
       filteredGames = allGames.filter(g => {
+        // Must have Card Game or Deckbuilding tag from Steam
+        const gameTags = (g.tags || []).map(t => t.toLowerCase());
+        const hasCardTag = gameTags.some(t => t.includes('card') || t.includes('deckbuilding'));
+        if (!hasCardTag) return false;
+
         if (search) {
           const searchable = [g.name, g.developer, g.publisher, g.shortDescription, ...(g.tags || [])].join(' ').toLowerCase();
           if (!searchable.includes(search)) return false;
         }
         // Multi-tag filter: game must have ALL selected tags
         if (selectedTags.size > 0) {
-          const gameTags = new Set(g.tags || []);
+          const gameTagsSet = new Set(g.tags || []);
           for (const tag of selectedTags) {
-            if (!gameTags.has(tag)) return false;
+            if (!gameTagsSet.has(tag)) return false;
           }
         }
+        // Favorites filter
+        if (showOnlyFavorites && !favorites.has(g.steamAppId)) return false;
         return true;
       });
 
@@ -322,7 +391,12 @@
       // Render grid
       $grid.innerHTML = pageGames.map(g => `
         <div class="bg-gray-800 rounded-lg overflow-hidden hover:ring-2 hover:ring-blue-500 transition cursor-pointer" onclick="showModal(${g.steamAppId})">
-          <img src="${g.headerImage || 'https://via.placeholder.com/460x215?text=No+Image'}" alt="${escapeHtml(g.name)}" class="w-full h-32 object-cover" loading="lazy">
+          <div class="relative">
+            <img src="${g.headerImage || 'https://via.placeholder.com/460x215?text=No+Image'}" alt="${escapeHtml(g.name)}" class="w-full h-32 object-cover" loading="lazy">
+            <button onclick="toggleFavorite(${g.steamAppId}, event)" class="absolute top-2 right-2 text-2xl hover:scale-110 transition-all drop-shadow-lg ${favorites.has(g.steamAppId) ? '' : 'grayscale opacity-60'}" title="Toggle favorite">
+              ⭐
+            </button>
+          </div>
           <div class="p-3">
             <h3 class="font-semibold text-white line-clamp-2 text-sm mb-1">${escapeHtml(g.name)}</h3>
             <p class="text-xs text-gray-400 mb-2">${g.releaseYear || 'N/A'} · ${escapeHtml(g.developer || 'Unknown')}</p>
@@ -365,7 +439,12 @@
         <div class="p-6">
           <div class="flex items-start justify-between gap-4 mb-4">
             <h2 class="text-2xl font-bold text-white">${escapeHtml(game.name)}</h2>
-            <a href="https://store.steampowered.com/app/${game.steamAppId}" target="_blank" class="shrink-0 px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded text-white text-sm">View on Steam</a>
+            <div class="flex items-center gap-2 shrink-0">
+              <button onclick="toggleFavorite(${game.steamAppId}, event)" class="px-3 py-2 bg-gray-700 hover:bg-gray-600 rounded text-white text-sm transition-all ${favorites.has(game.steamAppId) ? '' : 'grayscale opacity-60'}" title="Toggle favorite">
+                ⭐
+              </button>
+              <a href="https://store.steampowered.com/app/${game.steamAppId}" target="_blank" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded text-white text-sm">View on Steam</a>
+            </div>
           </div>
           
           <div class="flex flex-wrap gap-4 text-sm text-gray-400 mb-4">
@@ -375,8 +454,8 @@
           </div>
 
           <div class="flex flex-wrap gap-2 mb-4">
-            ${game.reviewScoreDesc ? `<span class="px-3 py-1 rounded ${getScoreClass(game.reviewScore)} text-sm">${escapeHtml(game.reviewScoreDesc)} (${(game.totalReviews || 0).toLocaleString()} reviews)</span>` : ''}
-            ${game.metacriticScore ? `<span class="px-3 py-1 rounded bg-green-600 text-sm">Metacritic: ${game.metacriticScore}</span>` : ''}
+            ${game.reviewScoreDesc ? `<a href="https://store.steampowered.com/app/${game.steamAppId}#app_reviews_hash" target="_blank" class="px-3 py-1 rounded ${getScoreClass(game.reviewScore)} text-sm hover:opacity-80 transition-opacity cursor-pointer">${escapeHtml(game.reviewScoreDesc)} (${(game.totalReviews || 0).toLocaleString()} reviews)</a>` : ''}
+            ${game.metacriticScore && game.metacriticUrl ? `<a href="${game.metacriticUrl}" target="_blank" class="px-3 py-1 rounded bg-green-600 hover:bg-green-700 text-sm transition-colors cursor-pointer">Metacritic: ${game.metacriticScore}</a>` : game.metacriticScore ? `<span class="px-3 py-1 rounded bg-green-600 text-sm">Metacritic: ${game.metacriticScore}</span>` : ''}
           </div>
 
           <p class="text-gray-300 mb-4">${escapeHtml(game.shortDescription || 'No description available.')}</p>
@@ -402,12 +481,6 @@
                 ${game.screenshots.slice(0, 4).map(s => `<img src="${s}" class="rounded w-full" loading="lazy">`).join('')}
               </div>
             </div>
-          ` : ''}
-
-          ${game.metacriticUrl ? `
-          <div class="mt-6">
-            <a href="${game.metacriticUrl}" target="_blank" class="px-4 py-2 bg-green-600 hover:bg-green-700 rounded text-white text-sm">View on Metacritic</a>
-          </div>
           ` : ''}
         </div>
       `;
@@ -441,8 +514,14 @@
       debounceTimer = setTimeout(applyFilters, 200);
     });
     $sort.addEventListener('change', applyFilters);
+    $showFavorites.addEventListener('click', () => {
+      $showFavorites.classList.toggle('bg-blue-600');
+      $showFavorites.classList.toggle('text-white');
+      $showFavorites.classList.toggle('bg-gray-700');
+      $showFavorites.classList.toggle('text-gray-400');
+      applyFilters();
+    });
     $modalClose.addEventListener('click', closeModal);
-    $modal.addEventListener('click', (e) => { if (e.target === $modal) closeModal(); });
     document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeModal(); });
 
     // Init
