@@ -33,7 +33,8 @@ interface SteamSearchResult {
 
 async function fetchSearchPage(
   tags: string,
-  start: number
+  start: number,
+  retries = 3
 ): Promise<{ results: SteamSearchResult[]; totalCount: number }> {
   const params = new URLSearchParams({
     sort_by: "Reviews_DESC",
@@ -48,34 +49,48 @@ async function fetchSearchPage(
   const url = `${STEAM_SEARCH_BASE}?${params}`
   console.log(`    Fetching page starting at ${start}...`)
 
-  const response = await axios.get(url, {
-    headers: getApiHeaders(),
-    timeout: 15000,
-  })
-
-  const data = response.data
-  const $ = cheerio.load(data.results_html)
-
-  const results: SteamSearchResult[] = []
-
-  $("a.search_result_row").each((_, el) => {
-    const $el = $(el)
-    const href = $el.attr("href") || ""
-    const appIdMatch = href.match(/\/app\/(\d+)/)
-    const name = $el.find(".title").text().trim()
-
-    if (appIdMatch && name) {
-      results.push({
-        appid: parseInt(appIdMatch[1]),
-        name,
+  for (let attempt = 0; attempt < retries; attempt++) {
+    try {
+      const response = await axios.get(url, {
+        headers: getApiHeaders(),
+        timeout: 15000,
       })
-    }
-  })
 
-  return {
-    results,
-    totalCount: data.total_count || 0,
+      const data = response.data
+      const $ = cheerio.load(data.results_html)
+
+      const results: SteamSearchResult[] = []
+
+      $("a.search_result_row").each((_, el) => {
+        const $el = $(el)
+        const href = $el.attr("href") || ""
+        const appIdMatch = href.match(/\/app\/(\d+)/)
+        const name = $el.find(".title").text().trim()
+
+        if (appIdMatch && name) {
+          results.push({
+            appid: parseInt(appIdMatch[1]),
+            name,
+          })
+        }
+      })
+
+      return {
+        results,
+        totalCount: data.total_count || 0,
+      }
+    } catch (err: unknown) {
+      if (axios.isAxiosError(err) && err.response?.status === 429) {
+        const waitTime = (attempt + 1) * 5000
+        console.log(`    Rate limited, waiting ${waitTime / 1000}s before retry...`)
+        await delay(waitTime)
+      } else {
+        throw err
+      }
+    }
   }
+
+  throw new Error(`Failed after ${retries} retries`)
 }
 
 async function searchByTags(
@@ -120,7 +135,7 @@ async function searchByTags(
       break
     }
 
-    await delay(1000)
+    await delay(2000)
   }
 
   return newCount
@@ -141,7 +156,7 @@ export async function extractFromSteamSearch(): Promise<number> {
     saveGamesJson(games)
 
     // Delay between different searches
-    await delay(2000)
+    await delay(5000)
   }
 
   console.log(`\n✓ Steam extraction complete. Added ${games.size - initialCount} new games (${games.size} total).`)
